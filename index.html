@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>ruby desktop ♡</title>
+
+<link href="https://fonts.googleapis.com/css2?family=VT323&family=Orbitron:wght@400;700&family=Space+Grotesk:wght@300;400;500&display=swap" rel="stylesheet"/>
+
+<style>
+:root{
+  --crimson:#c2006b;
+  --rose:#ff3dac;
+  --lav:#ff9de2;
+  --lav-dim:#e05fb0;
+  --bg:#0a0010;
+  --glow:0 0 18px rgba(255,61,172,0.45),0 0 50px rgba(255,157,226,0.15);
+}
+
+*{margin:0;padding:0;box-sizing:border-box;}
+
+body{
+  background:radial-gradient(circle at top,#3d0040,#0a0010);
+  font-family:'Space Grotesk',sans-serif;
+  overflow:hidden;
+  color:white;
+}
+
+/* BOOT */
+#boot{
+  position:fixed;inset:0;
+  background:black;
+  z-index:9999;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  align-items:center;
+  font-family:VT323;
+  color:var(--lav);
+}
+
+#boot-logo{
+  font-size:60px;
+  background:linear-gradient(90deg,#ff3dac,#ff9de2,#ff3dac);
+  -webkit-background-clip:text;
+  color:transparent;
+  animation:shine 2s infinite linear;
+}
+
+@keyframes shine{
+  0%{background-position:0%}
+  100%{background-position:200%}
+}
+
+#boot-bar-wrap{
+  width:300px;height:6px;
+  background:#222;
+  margin-top:15px;
+}
+
+#boot-bar{
+  height:100%;
+  width:0%;
+  background:linear-gradient(90deg,#ff3dac,#ff9de2);
+  transition:width .3s;
+}
+
+/* STAR TRAIL */
+.star{
+  position:fixed;
+  pointer-events:none;
+  color:#ff9de2;
+  animation:fade .8s forwards;
+}
+
+@keyframes fade{
+  to{opacity:0;transform:translateY(-20px) scale(0.3);}
+}
+
+/* NAV */
+.nav{
+  position:fixed;
+  bottom:0;
+  width:100%;
+  display:flex;
+  justify-content:space-around;
+  background:rgba(10,0,20,0.8);
+  padding:10px;
+  border-top:1px solid #ff9de2;
+}
+
+.nav button{
+  background:none;
+  border:none;
+  color:#aaa;
+  font-family:Orbitron;
+  font-size:10px;
+}
+
+.nav button:hover{
+  color:#ff9de2;
+  text-shadow:0 0 10px #ff9de2;
+}
+
+/* WINDOW */
+.window{
+  position:absolute;
+  top:80px;
+  left:50%;
+  transform:translateX(-50%);
+  width:260px;
+  background:rgba(20,0,30,0.9);
+  border:1px solid #ff9de2;
+  border-radius:10px;
+  box-shadow:var(--glow);
+}
+
+.titlebar{
+  background:rgba(255,61,172,0.2);
+  padding:6px;
+  font-size:12px;
+  font-family:Orbitron;
+}
+
+.content{
+  padding:10px;
+}
+</style>
+</head>
+
+<body>
+
+<!-- BOOT -->
+<div id="boot">
+  <div id="boot-logo">ruby desktop ♡</div>
+  <div id="boot-log"></div>
+  <div id="boot-bar-wrap"><div id="boot-bar"></div></div>
+</div>
+
+<div id="desktop"></div>
+
+<div class="nav">
+  <button onclick="openApp('home')">🏠 home</button>
+  <button onclick="openApp('about')">💗 about</button>
+  <button onclick="openApp('links')">🔗 links</button>
+</div>
+
+<script>
+const log = [
+ "initializing system...",
+ "loading glow core...",
+ "syncing aesthetic modules ✦",
+ "welcome back, princess ♡"
+];
+
+let i=0;
+const logEl=document.getElementById("boot-log");
+const bar=document.getElementById("boot-bar");
+
+function boot(){
+  if(i<log.length){
+    logEl.innerHTML+=log[i]+"<br>";
+    bar.style.width=((i+1)/log.length)*100+"%";
+    i++;
+    setTimeout(boot,700);
+  } else {
+    setTimeout(()=>document.getElementById("boot").style.display="none",600);
+  }
+}
+boot();
+
+/* STAR TRAIL */
+document.addEventListener("mousemove",e=>{
+  const s=document.createElement("div");
+  s.className="star";
+  s.innerHTML="✦";
+  s.style.left=e.clientX+"px";
+  s.style.top=e.clientY+"px";
+  document.body.appendChild(s);
+  setTimeout(()=>s.remove(),800);
+});
+
+/* WINDOWS */
+function openApp(app){
+  let text="";
+
+  if(app==="home") text="♡ ruby desktop<br>welcome back, princess";
+  if(app==="about") text="y2k brat interface system ✦";
+  if(app==="links") text="add your links here";
+
+  document.getElementById("desktop").innerHTML=`
+    <div class="window">
+      <div class="titlebar">${app}</div>
+      <div class="content">${text}</div>
+    </div>
+  `;
+}
+</script>
+
+</body>
+</html>
