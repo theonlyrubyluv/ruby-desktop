@@ -900,18 +900,28 @@ async function submitAppAsync(win, name, birthday, tz, ref, why, method, discord
   btn.disabled=true; btn.textContent='sending...';
   const discordUsername = sessionStorage.getItem('discord_username') || discord;
   const discordId = sessionStorage.getItem('discord_id') || null;
+  const discordTs = sessionStorage.getItem('discord_ts') || null;
+  const discordSig = sessionStorage.getItem('discord_sig') || null;
   try {
-    const {data, error} = await db.from('applications').insert({
-      name, birthday, timezone:tz, referral:ref,
-      reason:why, support_method:method,
-      discord_username: discordUsername,
-      discord_id: discordId,
-      status:'pending'
-    }).select().single();
-    if (error) throw new Error(error.message);
+    const res = await fetch('/api/submit-application', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name, birthday, timezone:tz, referral:ref,
+        reason:why, support_method:method,
+        discord_username: discordUsername,
+        discord_id: discordId,
+        discord_ts: discordTs,
+        discord_sig: discordSig,
+      })
+    });
+    const result = await res.json();
+    if (!res.ok) throw new Error(result.error || 'submission failed');
     // Clear stored discord session
     sessionStorage.removeItem('discord_username');
     sessionStorage.removeItem('discord_id');
+    sessionStorage.removeItem('discord_ts');
+    sessionStorage.removeItem('discord_sig');
     sfx('success'); toast('application sent ♡ redirecting...');
     btn.textContent='sent ♡';
     setTimeout(()=>openApp('discord'), 1800);
@@ -964,7 +974,13 @@ function checkDiscordCallback() {
   const params = new URLSearchParams(window.location.search);
   if (params.get('discord_linked')) {
     const username = decodeURIComponent(params.get('username') || '');
+    const discordId = decodeURIComponent(params.get('discord_id') || '');
+    const ts = decodeURIComponent(params.get('ts') || '');
+    const sig = decodeURIComponent(params.get('sig') || '');
     sessionStorage.setItem('discord_username', username);
+    sessionStorage.setItem('discord_id', discordId);
+    sessionStorage.setItem('discord_ts', ts);
+    sessionStorage.setItem('discord_sig', sig);
     // Clean URL
     window.history.replaceState({}, '', window.location.pathname);
     // Show apply window with linked state
