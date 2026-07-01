@@ -1,30 +1,32 @@
-// netlify/functions/discord-auth.js
+// api/discord-auth.js
 //
 // This function handles the redirect Discord sends back after a user
 // approves the OAuth request. It exchanges the temporary "code" Discord
 // gives us for an access token, uses that token to look up the user's
-// Discord ID + username, then redirects them back to the main site
-// with that info attached as URL query params.
+// Discord ID + username, signs that identity, then redirects back to
+// the main site with the signed info attached as URL query params.
 //
-// Required Netlify environment variables (you already have these):
+// Required Vercel environment variables (same values as Netlify had):
 //   DISCORD_CLIENT_ID
 //   DISCORD_CLIENT_SECRET
+//   DISCORD_AUTH_SECRET
 //
-// IMPORTANT: this must exactly match the redirect URI you registered
-// in the Discord Developer Portal:
-//   https://ruby-desktop.netlify.app/.netlify/functions/discord-auth
+// IMPORTANT: this must exactly match the redirect URI you register
+// in the Discord Developer Portal. Update it to your new Vercel domain, e.g.:
+//   https://ruby-desktop.vercel.app/api/discord-auth
 
-const REDIRECT_URI = "https://ruby-desktop.netlify.app/.netlify/functions/discord-auth";
 const crypto = require("crypto");
 
-exports.handler = async (event) => {
-  const code = event.queryStringParameters && event.queryStringParameters.code;
+// Update this to match your actual Vercel domain once deployed
+const SITE_URL = "https://ruby-desktop.vercel.app";
+const REDIRECT_URI = `${SITE_URL}/api/discord-auth`;
+
+module.exports = async (req, res) => {
+  const code = req.query.code;
 
   if (!code) {
-    return {
-      statusCode: 400,
-      body: "Missing OAuth code from Discord. Please try connecting again.",
-    };
+    res.status(400).send("Missing OAuth code from Discord. Please try connecting again.");
+    return;
   }
 
   try {
@@ -44,10 +46,8 @@ exports.handler = async (event) => {
     if (!tokenResponse.ok) {
       const errText = await tokenResponse.text();
       console.error("Discord token exchange failed:", errText);
-      return {
-        statusCode: 502,
-        body: "Could not verify Discord login. Please try again.",
-      };
+      res.status(502).send("Could not verify Discord login. Please try again.");
+      return;
     }
 
     const tokenData = await tokenResponse.json();
@@ -60,10 +60,8 @@ exports.handler = async (event) => {
     if (!userResponse.ok) {
       const errText = await userResponse.text();
       console.error("Discord user lookup failed:", errText);
-      return {
-        statusCode: 502,
-        body: "Could not retrieve your Discord profile. Please try again.",
-      };
+      res.status(502).send("Could not retrieve your Discord profile. Please try again.");
+      return;
     }
 
     const discordUser = await userResponse.json();
@@ -71,9 +69,9 @@ exports.handler = async (event) => {
     const discordUsername = discordUser.username;
 
     // Step 3: sign the verified identity so the client can't be spoofed
-    // into submitting an arbitrary discord_id later. The submit-application
-    // function re-derives this signature and rejects anything that doesn't
-    // match or has expired.
+    // into submitting an arbitrary discord_id later. api/submit-application.js
+    // re-derives this signature and rejects anything that doesn't match
+    // or has expired.
     const timestamp = Date.now().toString();
     const secret = process.env.DISCORD_AUTH_SECRET;
     const sig = crypto
@@ -82,22 +80,16 @@ exports.handler = async (event) => {
       .digest("hex");
 
     const redirectUrl =
-      `https://ruby-desktop.netlify.app/?discord_linked=true` +
+      `${SITE_URL}/?discord_linked=true` +
       `&username=${encodeURIComponent(discordUsername)}` +
       `&discord_id=${encodeURIComponent(discordId)}` +
       `&ts=${encodeURIComponent(timestamp)}` +
       `&sig=${encodeURIComponent(sig)}`;
 
-    return {
-      statusCode: 302,
-      headers: { Location: redirectUrl },
-      body: "",
-    };
+    res.writeHead(302, { Location: redirectUrl });
+    res.end();
   } catch (err) {
     console.error("discord-auth error:", err);
-    return {
-      statusCode: 500,
-      body: "Something went wrong connecting your Discord account.",
-    };
+    res.status(500).send("Something went wrong connecting your Discord account.");
   }
 };

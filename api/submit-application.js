@@ -1,15 +1,15 @@
-// netlify/functions/submit-application.js
+// api/submit-application.js
 //
 // Receives the application form data from the client, INCLUDING whatever
 // discord_id/username/signature the client claims to have. It only ever
-// trusts discord_id if the signature (created by discord-auth.js right
+// trusts discord_id if the signature (created by api/discord-auth.js right
 // after a real Discord OAuth exchange) checks out and hasn't expired.
 // It then performs the actual insert into Supabase using the service
 // role key, so this is the one place that decides what's "verified" —
 // the client itself is never trusted for that.
 //
-// Required Netlify environment variables:
-//   DISCORD_AUTH_SECRET        (same secret used in discord-auth.js)
+// Required Vercel environment variables:
+//   DISCORD_AUTH_SECRET        (same secret used in api/discord-auth.js)
 //   SUPABASE_URL                (e.g. https://xxxx.supabase.co)
 //   SUPABASE_SERVICE_ROLE_KEY   (Project Settings -> API -> service_role key.
 //                                 NEVER expose this one client-side.)
@@ -36,17 +36,15 @@ function verifyDiscordSignature(discordId, username, ts, sig) {
   return crypto.timingSafeEqual(a, b);
 }
 
-exports.handler = async (event) => {
-  if (event.httpMethod !== "POST") {
-    return { statusCode: 405, body: JSON.stringify({ error: "Method not allowed" }) };
+module.exports = async (req, res) => {
+  if (req.method !== "POST") {
+    res.status(405).json({ error: "Method not allowed" });
+    return;
   }
 
-  let payload;
-  try {
-    payload = JSON.parse(event.body);
-  } catch (err) {
-    return { statusCode: 400, body: JSON.stringify({ error: "Invalid request data" }) };
-  }
+  // Vercel parses JSON bodies automatically for you when Content-Type is
+  // application/json, so req.body is already an object here.
+  const payload = req.body || {};
 
   const {
     name, birthday, timezone, referral, reason, support_method,
@@ -54,7 +52,8 @@ exports.handler = async (event) => {
   } = payload;
 
   if (!name || !birthday || !timezone || !referral || !reason || !support_method) {
-    return { statusCode: 400, body: JSON.stringify({ error: "Missing required fields" }) };
+    res.status(400).json({ error: "Missing required fields" });
+    return;
   }
 
   // Age check (defense in depth even though the client already checks this)
@@ -64,7 +63,8 @@ exports.handler = async (event) => {
   const m = today.getMonth() - dob.getMonth();
   if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) age--;
   if (!Number.isFinite(age) || age < 18) {
-    return { statusCode: 400, body: JSON.stringify({ error: "Must be 18+" }) };
+    res.status(400).json({ error: "Must be 18+" });
+    return;
   }
 
   // Only trust discord_id if it comes with a valid, fresh signature.
@@ -77,7 +77,8 @@ exports.handler = async (event) => {
   const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!SUPABASE_URL || !SERVICE_KEY) {
-    return { statusCode: 500, body: JSON.stringify({ error: "Server misconfigured" }) };
+    res.status(500).json({ error: "Server misconfigured" });
+    return;
   }
 
   try {
@@ -101,12 +102,13 @@ exports.handler = async (event) => {
     if (!insertRes.ok) {
       const errText = await insertRes.text();
       console.error("Supabase insert failed:", errText);
-      return { statusCode: 502, body: JSON.stringify({ error: "Could not save application" }) };
+      res.status(502).json({ error: "Could not save application" });
+      return;
     }
 
-    return { statusCode: 200, body: JSON.stringify({ success: true }) };
+    res.status(200).json({ success: true });
   } catch (err) {
     console.error("submit-application error:", err);
-    return { statusCode: 500, body: JSON.stringify({ error: "Something went wrong" }) };
+    res.status(500).json({ error: "Something went wrong" });
   }
 };

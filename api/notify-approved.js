@@ -1,44 +1,45 @@
-// netlify/functions/notify-approved.js
+// api/notify-approved.js
 //
 // This function is called by a Supabase Database Webhook whenever a row
 // in the "applications" table is updated to status = 'approved'. It uses
 // your Discord bot token to open a DM with the applicant's Discord user
 // ID and send them an approval message.
 //
-// Required Netlify environment variable (you already have this):
+// Required Vercel environment variable:
 //   DISCORD_BOT_TOKEN
 //
 // IMPORTANT: your bot must share a server with the applicant, or it
 // cannot open a DM with them.
+//
+// IMPORTANT: after moving to Vercel, update the webhook URL in your
+// Supabase Database Webhook settings to point at:
+//   https://ruby-desktop.vercel.app/api/notify-approved
 
-exports.handler = async (event) => {
-  if (event.httpMethod !== "POST") {
-    return { statusCode: 405, body: "Method not allowed" };
+module.exports = async (req, res) => {
+  if (req.method !== "POST") {
+    res.status(405).json({ error: "Method not allowed" });
+    return;
   }
 
-  let payload;
-  try {
-    payload = JSON.parse(event.body);
-  } catch (err) {
-    console.error("Invalid webhook payload:", err);
-    return { statusCode: 400, body: "Invalid payload" };
-  }
-
+  const payload = req.body || {};
   const record = payload.record;
 
   if (!record) {
-    return { statusCode: 400, body: "Missing record in payload" };
+    res.status(400).json({ error: "Missing record in payload" });
+    return;
   }
 
   if (record.status !== "approved") {
-    return { statusCode: 200, body: "Ignored: not an approval event" };
+    res.status(200).json({ message: "Ignored: not an approval event" });
+    return;
   }
 
   const discordId = record.discord_id;
 
   if (!discordId) {
     console.error("Approved row has no discord_id:", record);
-    return { statusCode: 200, body: "Ignored: no discord_id on record" };
+    res.status(200).json({ message: "Ignored: no discord_id on record" });
+    return;
   }
 
   const botToken = process.env.DISCORD_BOT_TOKEN;
@@ -56,7 +57,8 @@ exports.handler = async (event) => {
     if (!dmChannelResponse.ok) {
       const errText = await dmChannelResponse.text();
       console.error("Failed to open DM channel:", errText);
-      return { statusCode: 502, body: "Could not open DM channel" };
+      res.status(502).json({ error: "Could not open DM channel" });
+      return;
     }
 
     const dmChannel = await dmChannelResponse.json();
@@ -81,12 +83,13 @@ exports.handler = async (event) => {
     if (!sendMessageResponse.ok) {
       const errText = await sendMessageResponse.text();
       console.error("Failed to send DM:", errText);
-      return { statusCode: 502, body: "Could not send DM" };
+      res.status(502).json({ error: "Could not send DM" });
+      return;
     }
 
-    return { statusCode: 200, body: "Approval DM sent" };
+    res.status(200).json({ message: "Approval DM sent" });
   } catch (err) {
     console.error("notify-approved error:", err);
-    return { statusCode: 500, body: "Something went wrong sending the DM" };
+    res.status(500).json({ error: "Something went wrong sending the DM" });
   }
 };
